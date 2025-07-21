@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🕌 تطبيق مواقيت الصلاة - Prayer Times App
 
 تطبيق جميل وتفاعلي مبني بتقنية React وواجهة Material UI يعرض أوقات الصلاة اليومية لمدن المغرب مع دعم كامل للغة العربية.
@@ -36,3 +37,7 @@
    git clone https://github.com/hamzaMallem/prayer-times-app.git
    cd prayer-times-app
    ```
+=======
+# prayer-times-app
+Beautiful React app for displaying Islamic prayer times for Moroccan cities. Uses Material UI, Axios, and AlAdhan API. Responsive, localized, and easy to use.
+>>>>>>> c95e194350f26116f0f02d7ff3299b5651aa4266
