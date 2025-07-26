@@ -192,27 +192,27 @@ export default function Home() {
             <PrayerCard
               name="الفجر"
               time={timings.Fajr}
-              image="../src/assets/images/img1.png"
+              image="../../public/subh.jpeg"
             />
             <PrayerCard
               name="الظهر"
               time={timings.Dhuhr}
-              image="../src/assets/images/img1.png"
+              image="../../public/dhur.jpeg"
             />
             <PrayerCard
               name="العصر"
               time={timings.Asr}
-              image="../src/assets/images/img1.png"
+              image="../../public/asr.jpeg"
             />
             <PrayerCard
               name="المغرب"
               time={timings.Maghrib}
-              image="../src/assets/images/img1.png"
+              image="../../public/maghreb.png"
             />
             <PrayerCard
               name="العشاء"
               time={timings.Isha}
-              image="../src/assets/images/img1.png"
+              image="../../public/isha.png"
             />
           </Stack>
           {/* مكون اختيار المدينة */}
