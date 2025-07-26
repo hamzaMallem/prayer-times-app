@@ -189,31 +189,15 @@ export default function Home() {
               mt: 4,
             }}
           >
-            <PrayerCard
-              name="الفجر"
-              time={timings.Fajr}
-              image="../../public/subh.jpeg"
-            />
-            <PrayerCard
-              name="الظهر"
-              time={timings.Dhuhr}
-              image="../../public/dhur.jpeg"
-            />
-            <PrayerCard
-              name="العصر"
-              time={timings.Asr}
-              image="../../public/asr.jpeg"
-            />
+            <PrayerCard name="الفجر" time={timings.Fajr} image="subh.jpeg" />
+            <PrayerCard name="الظهر" time={timings.Dhuhr} image="dhur.jpeg" />
+            <PrayerCard name="العصر" time={timings.Asr} image="asr.jpeg" />
             <PrayerCard
               name="المغرب"
               time={timings.Maghrib}
-              image="../../public/maghreb.png"
+              image="maghreb.png"
             />
-            <PrayerCard
-              name="العشاء"
-              time={timings.Isha}
-              image="../../public/isha.png"
-            />
+            <PrayerCard name="العشاء" time={timings.Isha} image="isha.png" />
           </Stack>
           {/* مكون اختيار المدينة */}
           <div
