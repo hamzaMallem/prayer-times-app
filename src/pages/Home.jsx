@@ -1,217 +1,130 @@
-import React from "react";
-import { useState, useEffect } from "react";
-
-// استيراد المكونات من مكتبة material ui
+import React, { useState, useEffect } from "react";
+// استيراد مكونات الواجهة
 import Card from "@mui/material/Card";
-import CardActions from "@mui/material/CardActions";
 import CardContent from "@mui/material/CardContent";
-import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import Grid from "@mui/material/Grid";
 import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import PrayerCard from "../components/PrayerCard";
 import CitySelector from "../components/CitySelector";
+import CountdownTimer from "../components/CountdownTimer";
+
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
-import axios from "axios";
+
+// استيراد الـ hooks والدوال المنطقية
+import { usePrayerTimes } from "../hooks/usePrayerTimes";
+import { useNotification } from "../hooks/useNotification";
+import { getNextPrayerIndex, getTimeRemaining } from "../utils/prayerLogic";
+
+// مكتبة اليوميات dayjs لإدارة التواريخ
 import dayjs from "dayjs";
 import "dayjs/locale/ar-ma";
 import localizedFormat from "dayjs/plugin/localizedFormat";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { useRef } from "react";
 
-dayjs.locale("ar-ma"); // تعيين اللغة العربية المغربية كلغة افتراضية للتواريخ
+dayjs.locale("ar-ma");
 dayjs.extend(localizedFormat);
 dayjs.extend(relativeTime);
 
-// const now = dayjs();
-// console.log(now.format('YYYY-MM-DD HH:mm:ss')); // طباعة الوقت الحالي في الكونسول
-// console.log(dayjs().from(dayjs('2025-08-22'))); // "قبل يوم واحد"
-
 export default function Home() {
-  // متغير الحالة لاختيار المدينة من CitySelector.jsx
+  // حالة المدينة المختارة، الافتراضي "الدار البيضاء"
   const [selectedCity, setSelectedCity] = useState({
-    label: "الدار البيضاء",
-    value: "Casablanca",
+    label: " سيدي سليمان",
+    value: "Sidi Slimane",
   });
+
+  // جلب مواقيت الصلاة والتاريخ مباشرة عبر الـhook
+  const { timings, dateApi } = usePrayerTimes(selectedCity.value);
+
+  // جلب دالة الإشعارات عبر الـhook
+  const sendNotification = useNotification();
+
+  // حالات التحكم في الإشعارات حتى لا تتكرر
+  const [notified, setNotified] = useState({
+    before5min: false,
+    atTime: false,
+  });
+
+  // تخزين معلومات عن الصلاة القادمة والمؤقت
   const [nextPrayerIndex, setNextPrayerIndex] = useState(2);
-  // متغيرات الحالة لأوقات الصلاة
-  const [timings, setTimings] = useState({
-    Fajr: "",
-    Dhuhr: "",
-    Asr: "",
-    Maghrib: "",
-    Isha: "",
-  });
+  const [remaining, setRemaining] = useState(""); // الوقت المتبقي
+  const [timeToday, setTimeToday] = useState(""); // الوقت الحالي
+
+  // مصفوفة الصلوات مرتبة حسب اليوم
   const parayerArray = [
-    {
-      key: "Fajr",
-      displayName: "الفجر",
-    },
-    {
-      key: "Dhuhr",
-      displayName: "الظهر",
-    },
-    {
-      key: "Asr",
-      displayName: "العصر",
-    },
-    {
-      key: "Maghrib",
-      displayName: "المغرب",
-    },
-    {
-      key: "Isha",
-      displayName: "العشاء",
-    },
+    { key: "Fajr", displayName: "الفجر" },
+    { key: "Dhuhr", displayName: "الظهر" },
+    { key: "Asr", displayName: "العصر" },
+    { key: "Maghrib", displayName: "المغرب" },
+    { key: "Isha", displayName: "العشاء" },
   ];
-  let prayerdisplayName = parayerArray[nextPrayerIndex].displayName;
-  console.log(prayerdisplayName);
 
-  // دالة تغيير المدينة المختارة
+  // عند تغيير المدينة يتم ضبط المدينة المختارة وإعادة ضبط الإشعارات
   const handleCityChange = (city) => {
-    setSelectedCity({
-      label: city.label,
-      value: city.value,
-    });
+    setSelectedCity({ label: city.label, value: city.value });
+    setNotified({ before5min: false, atTime: false }); // إعادة تعيين حالة الإشعار
   };
 
-  //  api متغيرات الحالة لتاريخ اليوم واسم اليوم
-  const [dateApi, setDateApi] = useState({
-    dayApi: null,
-    weekdayApi: null,
-  });
+  // المؤقت الرئيسي لتحديث العد التنازلي والإشعارات كل ثانية
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = dayjs(); // الوقت الحالي
+      setTimeToday(now.format("HH:mm:ss"));
 
-  // جلب بيانات أوقات الصلاة والتاريخ من API
-  const getData = async () => {
-    try {
-      const resonse = await axios.get(
-        "http://api.aladhan.com/v1/timingsByCity",
-        {
-          params: {
-            city: selectedCity.value,
-            country: "Morocco",
-            method: 5,
-          },
-        }
+      // معرفة أي صلاة قادمة الآن
+      const index = getNextPrayerIndex(now, timings);
+      setNextPrayerIndex(index);
+
+      // حساب الوقت المتبقي للصلاة القادمة
+      const nextPrayerObject = parayerArray[index];
+      const { formatted, totalSeconds } = getTimeRemaining(
+        now,
+        timings[nextPrayerObject.key]
       );
+      setRemaining(formatted);
 
-      const responseDateWeekday = {
-        // apiجلب التاريخ واسم اليوم من الاستجابة
-        dayApi: resonse.data.data.date.gregorian.date,
-        weekdayApi: resonse.data.data.date.hijri.weekday.ar,
-      };
-      console.log(resonse); // طباعة الاستجابة في الكونسول
-      setDateApi({
-        // تحديث متغيرات التاريخ واسم اليوم
-        dayApi: responseDateWeekday.dayApi,
-        weekdayApi: responseDateWeekday.weekdayApi,
-      });
+      // إذا تبقى 5 دقائق فقط للصلاة ولم يُرسل إشعار بعد
+      if (totalSeconds === 300 && !notified.before5min) {
+        sendNotification(
+          `الصلاة القادمة: ${nextPrayerObject.displayName}`,
+          `باقي 5 دقائق على ${nextPrayerObject.displayName}`
+        );
+        setNotified((prev) => ({ ...prev, before5min: true }));
+      }
 
-      const prayerTimes = resonse.data.data.timings;
+      // إذا حان وقت الصلاة ولم يُرسل إشعار بعد
+      if (totalSeconds === 0 && !notified.atTime) {
+        sendNotification(
+          `حان وقت ${nextPrayerObject.displayName}`,
+          `قم إلى الصلاة!`
+        );
+        setNotified((prev) => ({ ...prev, atTime: true }));
+      }
 
-      // تحديث متغيرات أوقات الصلاة
-      setTimings({
-        Fajr: prayerTimes.Fajr,
-        Dhuhr: prayerTimes.Dhuhr,
-        Asr: prayerTimes.Asr,
-        Maghrib: prayerTimes.Maghrib,
-        Isha: prayerTimes.Isha,
-      });
-    } catch (error) {
-      console.error("حدث خطأ أثناء جلب أوقات الصلاة:", error);
-    }
-  };
+      // إذا أصبح الوقت المتبقي أكثر من 5 دقائق، أعِد ضبط حالة الإشعار (للصلاة التالية)
+      if (totalSeconds > 300 && (notified.before5min || notified.atTime)) {
+        setNotified({ before5min: false, atTime: false });
+      }
+    }, 1000);
 
-  // متغيرات الحالة لعرض اليوم والوقت الحالي
-  const [timeToday, setTimeToday] = useState("");
-  useEffect(() => {
-    getData(); // جلب البيانات عند تغيير المدينة
-  }, [selectedCity]);
-
-  // useRef new function
-  const timingsRef = useRef(timings);
-  const [remaining, setRemaining] = useState("");
-  // const [nextPrayerIndex, setNextPrayerIndex] = useState(0);
-  // جلب البيانات وفت الصلوات من الاستجابة عند تغيير المدينة أو عند تغيير اوقات الصلاة
-  useEffect(() => {
-    timingsRef.current = timings;
-  }, [timings]);
-
-  // دالة تحديث الوقت الحالي كل وفت صلاة قادم
-
-  useEffect(() => {
-    const timer = setInterval(getTimerPrayer, 1000);
+    // تنظيف المؤقت عند مغادرة الصفحة أو تغيير الدوال
     return () => clearInterval(timer);
-  }, [timings]);
+  }, [timings, notified, parayerArray, sendNotification]);
 
-  const getTimerPrayer = () => {
-    // const now = dayjs("2025-07-21 20:20:20", "YYYY-MM-DD HH:mm:ss");
-    const now = dayjs();
-    const currentTimings = timingsRef.current;
-    setTimeToday(now.format("HH:mm:ss"));
-
-    const fajrTime = dayjs(
-      now.format("YYYY-MM-DD") + " " + currentTimings["Fajr"],
-      "YYYY-MM-DD HH:mm"
-    );
-    const dhuhrTime = dayjs(
-      now.format("YYYY-MM-DD") + " " + currentTimings["Dhuhr"],
-      "YYYY-MM-DD HH:mm"
-    );
-    const asrTime = dayjs(
-      now.format("YYYY-MM-DD") + " " + currentTimings["Asr"],
-      "YYYY-MM-DD HH:mm"
-    );
-    const maghribTime = dayjs(
-      now.format("YYYY-MM-DD") + " " + currentTimings["Maghrib"],
-      "YYYY-MM-DD HH:mm"
-    );
-    const ishaTime = dayjs(
-      now.format("YYYY-MM-DD") + " " + currentTimings["Isha"],
-      "YYYY-MM-DD HH:mm"
-    );
-
-    let prayerIndex = 0;
-    if (now.isAfter(fajrTime) && now.isBefore(dhuhrTime)) prayerIndex = 1;
-    else if (now.isAfter(dhuhrTime) && now.isBefore(asrTime)) prayerIndex = 2;
-    else if (now.isAfter(asrTime) && now.isBefore(maghribTime)) prayerIndex = 3;
-    else if (now.isAfter(maghribTime) && now.isBefore(ishaTime))
-      prayerIndex = 4;
-    else if (now.isAfter(ishaTime) || now.isBefore(fajrTime)) prayerIndex = 0;
-
-    setNextPrayerIndex(prayerIndex);
-
-    const nextPrayerObject = parayerArray[prayerIndex];
-    const nextPrayerTime = currentTimings[nextPrayerObject.key];
-    let nextPrayerDateTime = dayjs(
-      now.format("YYYY-MM-DD") + " " + nextPrayerTime,
-      "YYYY-MM-DD HH:mm"
-    );
-    if (prayerIndex === 0 && now.isAfter(ishaTime))
-      nextPrayerDateTime = nextPrayerDateTime.add(1, "day");
-
-    const remainingMs = nextPrayerDateTime.diff(now);
-    const diffInSec = Math.max(0, Math.floor(remainingMs / 1000));
-    const hours = Math.floor(diffInSec / 3600);
-    const minutes = Math.floor((diffInSec % 3600) / 60);
-    const seconds = diffInSec % 60;
-    const formatted = `${hours.toString().padStart(2, "0")} : ${minutes.toString().padStart(2, "0")} : ${seconds.toString().padStart(2, "0")}`;
-    setRemaining(formatted);
-  };
-
-  // إعدادات الثيم لمعرفة حجم الشاشة (جهاز صغير أم كبير)
+  // معرفة إذا كان الجهاز موبايل لتغيير اتجاه البطاقات
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
+  // واجهة المستخدم
   return (
     <div style={{ width: "100%", padding: "20px" }}>
       <Card>
         <CardContent>
           <Grid container spacing={2}>
             {/* عرض التاريخ واسم المدينة */}
-            <Grid size={6}>
+            <Grid item xs={12} md={6}>
               <Typography variant="h6" color="secondary" fontWeight={600}>
                 {dateApi.weekdayApi} {" : "}
                 {dateApi.dayApi}{" "}
@@ -228,7 +141,7 @@ export default function Home() {
               </Typography>
             </Grid>
             {/* معلومات عن الصلاة القادمة */}
-            <Grid size={6}>
+            <Grid item xs={12} md={6}>
               <Typography
                 variant="h6"
                 color="white"
@@ -240,8 +153,12 @@ export default function Home() {
                   {" "}
                   {parayerArray[nextPrayerIndex].displayName}
                 </span>
+                <CountdownTimer
+                  remaining={remaining}
+                  nextPrayerName={parayerArray[nextPrayerIndex].displayName}
+                />
               </Typography>
-              <Typography
+              {/* <Typography
                 variant="h3"
                 sx={{
                   color: "#2fc4b2",
@@ -253,14 +170,14 @@ export default function Home() {
                 }}
               >
                 {remaining}
-              </Typography>
+              </Typography> */}
             </Grid>
-            {/* نهاية معلومات الصلاة القادمة */}
           </Grid>
 
           {/* خط فاصل بين الأقسام */}
           <Divider sx={{ my: 4, borderColor: "secondary.main" }} />
-          {/* بطاقات أوقات الصلوات */}
+
+          {/* بطاقات الصلوات */}
           <Stack
             direction={isMobile ? "column" : "row"}
             sx={{
@@ -308,7 +225,6 @@ export default function Home() {
           >
             <CitySelector onCityChange={handleCityChange} />
           </div>
-          {/* نهاية مكون اختيار المدينة */}
         </CardContent>
       </Card>
     </div>
